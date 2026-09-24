@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { disablePush, enablePush, getPushState, type PushState } from "@/lib/push";
+import type { LiveRole } from "@/lib/live";
+import LiveConsent from "./LiveConsent";
 
 const HINTS: Partial<Record<PushState, string>> = {
   "needs-install":
@@ -11,7 +13,21 @@ const HINTS: Partial<Record<PushState, string>> = {
   denied: "Notifications are blocked for this app. Turn them on in your phone's settings, then reopen the app.",
 };
 
-export default function Settings({ userId, onClose }: { userId: string; onClose: () => void }) {
+export default function Settings({
+  userId,
+  partnerName,
+  liveRole,
+  onSeeLive,
+  onLiveDisabled,
+  onClose,
+}: {
+  userId: string;
+  partnerName: string;
+  liveRole: LiveRole | null;
+  onSeeLive: () => void;
+  onLiveDisabled: () => void;
+  onClose: () => void;
+}) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +59,18 @@ export default function Settings({ userId, onClose }: { userId: string; onClose:
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <section className="sheet" role="dialog" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+        {liveRole === "viewer" && (
+          <div className="sheet-row">
+            <div>
+              <h2>Live view</h2>
+              <p className="muted">Video only. Nothing is saved or recorded.</p>
+            </div>
+            <button className="primary" onClick={onSeeLive}>See {partnerName} live</button>
+          </div>
+        )}
+        {liveRole === "sharer" && (
+          <LiveConsent sharerId={userId} viewerName={partnerName} onDisabled={onLiveDisabled} />
+        )}
         <div className="sheet-row">
           <div>
             <h2>Notifications</h2>

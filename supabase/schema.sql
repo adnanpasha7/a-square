@@ -235,6 +235,48 @@ create policy "members delete own photos"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+-- ---------- Live view: her standing permission (only she can write her own row) ----------
+create table if not exists public.live_consent (
+  sharer_id  uuid primary key references auth.users(id) on delete cascade,
+  allowed    boolean not null default false,
+  updated_at timestamptz default now()
+);
+
+alter table public.live_consent enable row level security;
+
+create policy "members can read live consent"
+  on public.live_consent for select to authenticated
+  using (public.is_member());
+
+create policy "sharer creates own consent"
+  on public.live_consent for insert to authenticated
+  with check (public.is_member() and sharer_id = auth.uid());
+
+create policy "sharer changes own consent"
+  on public.live_consent for update to authenticated
+  using (sharer_id = auth.uid())
+  with check (public.is_member() and sharer_id = auth.uid());
+
+-- No delete policy: the row can only be switched off, not removed.
+
+-- ---------- Realtime Authorization: private channels for members only ----------
+-- live           live-view signaling (request / accept / offer / answer / ICE / end)
+-- room           typing indicator
+-- messages-feed  chat postgres_changes (table RLS still decides which rows arrive)
+create policy "members read private channels"
+  on realtime.messages for select to authenticated
+  using (
+    public.is_member()
+    and (select realtime.topic()) in ('live', 'room', 'messages-feed')
+  );
+
+create policy "members send on private channels"
+  on realtime.messages for insert to authenticated
+  with check (
+    public.is_member()
+    and (select realtime.topic()) in ('live', 'room')
+  );
+
 -- ============================================================
 -- AFTER you create both users (Authentication → Users → Add user),
 -- run this with your real emails and names:

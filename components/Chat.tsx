@@ -133,7 +133,7 @@ export default function Chat({
   // Realtime: new messages, read receipts / edits / unsends, and reactions
   useEffect(() => {
     const channel = supabase
-      .channel("messages-feed")
+      .channel("messages-feed", { config: { private: true } })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => {
         const m = p.new as Message;
         merge([m]);
@@ -171,7 +171,7 @@ export default function Chat({
   // Typing indicator: ephemeral broadcast, nothing touches the database
   useEffect(() => {
     const room = supabase
-      .channel("room", { config: { broadcast: { self: false } } })
+      .channel("room", { config: { private: true, broadcast: { self: false } } })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         if (payload?.user_id === userId) return; // my other devices
         setPartnerTyping(true);

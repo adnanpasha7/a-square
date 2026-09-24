@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Member, type Message } from "@/lib/supabase";
+import { liveRole, useLive } from "@/lib/live";
 import Chat from "./Chat";
 import Gallery from "./Gallery";
 import Lightbox from "./Lightbox";
 import Settings from "./Settings";
+import LiveView from "./LiveView";
 import { Heart, Wordmark } from "./Heart";
 
 type Tab = "chat" | "photos";
@@ -16,6 +18,7 @@ export default function Home({ userId }: { userId: string }) {
   const [viewing, setViewing] = useState<Message | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const live = useLive(userId, liveRole(userId));
 
   useEffect(() => {
     supabase.from("members").select("*").then(({ data, error }) => {
@@ -61,6 +64,9 @@ export default function Home({ userId }: { userId: string }) {
           <h1 className="partner">
             <span>{partner?.display_name ?? "A"}</span>
             <Heart className="tiny" />
+            {live.role === "viewer" && (live.phase === "connecting" || live.phase === "live") && (
+              <span className="live-dot" role="img" aria-label="Live view active" />
+            )}
           </h1>
           {partnerTyping && <p className="typing-line" aria-hidden="true">typing…</p>}
         </div>
@@ -92,7 +98,20 @@ export default function Home({ userId }: { userId: string }) {
       )}
 
       {viewing && <Lightbox message={viewing} onClose={() => setViewing(null)} />}
-      {settingsOpen && <Settings userId={userId} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <Settings
+          userId={userId}
+          partnerName={partner?.display_name ?? "them"}
+          liveRole={live.role}
+          onSeeLive={() => {
+            setSettingsOpen(false);
+            live.start();
+          }}
+          onLiveDisabled={live.end}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      <LiveView live={live} partnerName={partner?.display_name ?? "them"} />
     </main>
   );
 }

@@ -9,6 +9,7 @@ It installs to the home screen on iPhone and Android, with push notifications on
 supabase/schema.sql              tables, RLS, storage bucket, realtime, read receipts (fresh install)
 supabase/migrations/             changes to run on an existing database, in order
 supabase/functions/notify/       edge function that sends push notifications
+supabase/functions/turn-credentials/  edge function that mints short-lived TURN servers for live view
 lib/                             supabase client, image compression, push, signed URLs
 components/                      Login, Home (tabs), Chat, Gallery, Lightbox, Settings
 public/sw.js                     service worker (push + notification taps)
