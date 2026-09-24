@@ -6,6 +6,10 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+function sameBytes(a: Uint8Array, b: Uint8Array) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 export function isStandalone() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -38,12 +42,18 @@ export async function enablePush(userId: string) {
   if (permission !== "granted") throw new Error("Notifications were not allowed");
 
   const reg = await navigator.serviceWorker.ready;
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
-    }));
+  const key = urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!);
+
+  // A subscription made with an older VAPID key can never receive pushes signed with the
+  // current one (the push service rejects them), so drop it and subscribe again.
+  let sub = await reg.pushManager.getSubscription();
+  const oldKey = sub?.options.applicationServerKey;
+  if (sub && oldKey && !sameBytes(new Uint8Array(oldKey), key)) {
+    await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    await sub.unsubscribe();
+    sub = null;
+  }
+  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
 
   const json = sub.toJSON();
   const { error } = await supabase.from("push_subscriptions").upsert({
