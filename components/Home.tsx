@@ -105,6 +105,7 @@ export default function Home({ userId }: { userId: string }) {
           liveRole={live.role}
           onSeeLive={() => {
             setSettingsOpen(false);
+            setTab("chat");
             live.start();
           }}
           onLiveDisabled={live.end}

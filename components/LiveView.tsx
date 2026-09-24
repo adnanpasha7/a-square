@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isIOS } from "@/lib/push";
 import type { Live, LiveNote } from "@/lib/live";
 
@@ -65,38 +65,17 @@ export default function LiveView({ live, partnerName }: { live: Live; partnerNam
 
   if (!role || phase === "idle") return null;
 
-  if (phase === "ended" && live.note) {
-    return (
-      <div className="live-toast" role="alert">
-        <p>{noteText(live.note, partnerName, role)}</p>
-        <button className="ghost" onClick={live.dismiss}>OK</button>
-      </div>
-    );
-  }
+  // if (phase === "ended" && live.note) {
+  //   return (
+  //     <div className="live-toast" role="alert">
+  //       <p>{noteText(live.note, partnerName, role)}</p>
+  //       <button className="ghost" onClick={live.dismiss}>OK</button>
+  //     </div>
+  //   );
+  // }
 
-  // ---------- viewer: full-screen, receive-only ----------
-  if (role === "viewer") {
-    const status =
-      phase === "asking" ? `Asking ${partnerName}…`
-      : phase === "waiting" ? "Waiting for her…"
-      : phase === "connecting" ? "Connecting…"
-      : "Live";
-    return (
-      <div className="live-screen" role="dialog" aria-modal="true" aria-label={`${partnerName} live`}>
-        <Video stream={live.remoteStream} className="live-video" />
-        <div className="live-top">
-          <p className={`live-status ${phase === "live" ? "on" : ""}`} role="status">
-            {phase === "live" && <span className="live-dot" aria-hidden="true" />}
-            {status}
-          </p>
-          {live.turnWarning && (
-            <p className="live-warning">No relay server available. Connections over mobile data may fail.</p>
-          )}
-        </div>
-        <button className="live-end" onClick={live.end} aria-label="End live view">End</button>
-      </div>
-    );
-  }
+  // ---------- viewer: small floating window, drag it anywhere and keep chatting ----------
+  if (role === "viewer") return <ViewerWindow live={live} partnerName={partnerName} />;
 
   // ---------- sharer: the request prompt ----------
   if (phase === "incoming") {
@@ -126,24 +105,95 @@ export default function LiveView({ live, partnerName }: { live: Live; partnerNam
   }
 
   // ---------- sharer: always-visible LIVE bar while the camera is on ----------
+  return null;
+}
+
+const EDGE = 8;
+
+function ViewerWindow({ live, partnerName }: { live: Live; partnerName: string }) {
+  const { phase } = live;
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [big, setBig] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
+
+  // Keep the window fully on screen
+  const clamp = useCallback((x: number, y: number) => {
+    const el = boxRef.current;
+    const w = el?.offsetWidth ?? 0;
+    const h = el?.offsetHeight ?? 0;
+    return {
+      x: Math.min(Math.max(EDGE, x), window.innerWidth - w - EDGE),
+      y: Math.min(Math.max(EDGE, y), window.innerHeight - h - EDGE),
+    };
+  }, []);
+
+  // Start in the top-right corner, below the header
+  useEffect(() => {
+    const el = boxRef.current;
+    if (el) setPos(clamp(window.innerWidth - el.offsetWidth - 12, 72));
+  }, [clamp]);
+
+  // Re-clamp when resized or the window is enlarged/shrunk
+  useEffect(() => {
+    const fit = () => setPos((p) => (p ? clamp(p.x, p.y) : p));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [big, clamp]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button") || !pos) return;
+    drag.current = { id: e.pointerId, dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    setPos(clamp(e.clientX - d.dx, e.clientY - d.dy));
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (drag.current?.id === e.pointerId) drag.current = null;
+  };
+
+  const status =
+    phase === "asking" ? `Asking ${partnerName}…`
+    : phase === "waiting" ? "Waiting for her…"
+    : phase === "connecting" ? "Connecting…"
+    : "Live";
+
   return (
-    <div className="live-share" role="status" aria-label={`Live. ${partnerName} is watching.`}>
-      <Video stream={live.localStream} mirrored={live.facing === "user"} className="live-preview" />
-      <div className="live-share-text">
-        <strong>
-          <span className="live-dot" aria-hidden="true" />
-          {phase === "live" ? `LIVE — ${partnerName} is watching` : `LIVE — connecting to ${partnerName}…`}
-        </strong>
-        <span>Video only · nothing is recorded</span>
-      </div>
-      <button className="live-flip" onClick={live.flip} aria-label="Switch between front and back camera" disabled={!live.localStream}>
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-          <path d="M4 9.5V8a2 2 0 0 1 2-2h2l1.4-2h5.2L16 6h2a2 2 0 0 1 2 2v1.5" />
-          <path d="M20 14.5V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" />
-          <path d="m7 12.5 2-2.5 2 2.5M17 11.5l-2 2.5-2-2.5" />
+    <div
+      ref={boxRef}
+      className={`live-float ${big ? "big" : ""}`}
+      style={pos ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : { visibility: "hidden" }}
+      role="region"
+      aria-label={`${partnerName} live`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <Video stream={live.remoteStream} className="live-video" />
+      <p className={`live-status ${phase === "live" ? "on" : ""}`} role="status">
+        {phase === "live" && <span className="live-dot" aria-hidden="true" />}
+        {status}
+      </p>
+      {live.turnWarning && <p className="live-warning">No relay server. Mobile data may fail.</p>}
+      <button
+        className="live-float-btn live-size"
+        onClick={() => setBig((b) => !b)}
+        aria-label={big ? "Make live view smaller" : "Make live view bigger"}
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          {big ? <path d="M9 4v5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 15v5h-5" />}
         </svg>
       </button>
-      <button className="live-share-end" onClick={live.end} aria-label="End live view">End</button>
+      <button className="live-float-btn live-end" onClick={live.end} aria-label="End live view">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
     </div>
   );
 }

@@ -68,9 +68,9 @@ export default function Settings({
             <button className="primary" onClick={onSeeLive}>See {partnerName} live</button>
           </div>
         )}
-        {liveRole === "sharer" && (
+        {/* {liveRole === "sharer" && (
           <LiveConsent sharerId={userId} viewerName={partnerName} onDisabled={onLiveDisabled} />
-        )}
+        )} */}
         <div className="sheet-row">
           <div>
             <h2>Notifications</h2>
