@@ -16,6 +16,15 @@ export type Message = {
   image_height: number | null;
   created_at: string;
   read_at: string | null;
+  edited_at: string | null;
+  deleted_at: string | null; // unsent: body and image fields are null
+};
+
+export type Reaction = {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
 };
 
 export type Member = { user_id: string; display_name: string };

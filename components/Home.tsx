@@ -15,6 +15,7 @@ export default function Home({ userId }: { userId: string }) {
   const [tab, setTab] = useState<Tab>("chat");
   const [viewing, setViewing] = useState<Message | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
 
   useEffect(() => {
     supabase.from("members").select("*").then(({ data, error }) => {
@@ -56,10 +57,13 @@ export default function Home({ userId }: { userId: string }) {
   return (
     <main className="shell">
       <header className="topbar">
-        <h1 className="partner">
-          <span>{partner?.display_name ?? "A"}</span>
-          <Heart className="tiny" />
-        </h1>
+        <div className="partner-box">
+          <h1 className="partner">
+            <span>{partner?.display_name ?? "A"}</span>
+            <Heart className="tiny" />
+          </h1>
+          {partnerTyping && <p className="typing-line" aria-hidden="true">typing…</p>}
+        </div>
         <nav className="tabs" aria-label="Views">
           <button aria-pressed={tab === "chat"} onClick={() => setTab("chat")}>Chat</button>
           <button aria-pressed={tab === "photos"} onClick={() => setTab("photos")}>Photos</button>
@@ -73,7 +77,13 @@ export default function Home({ userId }: { userId: string }) {
 
       {/* Chat stays mounted so its realtime subscription and scroll position survive tab switches */}
       <div className="view" hidden={tab !== "chat"}>
-        <Chat userId={userId} onOpenImage={setViewing} active={tab === "chat"} />
+        <Chat
+          userId={userId}
+          partnerName={partner?.display_name ?? "They"}
+          onOpenImage={setViewing}
+          onPartnerTyping={setPartnerTyping}
+          active={tab === "chat"}
+        />
       </div>
       {tab === "photos" && (
         <div className="view">

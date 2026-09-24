@@ -6,7 +6,8 @@ It installs to the home screen on iPhone and Android, with push notifications on
 ## What's in here
 
 ```
-supabase/schema.sql              tables, RLS, storage bucket, realtime, read receipts
+supabase/schema.sql              tables, RLS, storage bucket, realtime, read receipts (fresh install)
+supabase/migrations/             changes to run on an existing database, in order
 supabase/functions/notify/       edge function that sends push notifications
 lib/                             supabase client, image compression, push, signed URLs
 components/                      Login, Home (tabs), Chat, Gallery, Lightbox, Settings
@@ -79,7 +80,8 @@ Any static-capable host works; the app is fully client-side.
 
 - **Security:** Row Level Security plus a `members` allowlist. Every table and the photo bucket
   check `is_member()`, so even a valid Supabase account that isn't one of you two sees nothing.
-  Messages can't be edited after sending; read receipts go through the `mark_read()` function.
+  There's no general UPDATE policy on messages: read receipts, edits and unsends go through the
+  `mark_read()`, `edit_message()` and `unsend_message()` functions, which check who you are.
 - **Photos:** resized on the phone to 2048px JPEG (~300–600 KB) plus a 480px thumbnail, and
   uploaded to a private bucket under `photos/<user_id>/`. They're displayed through signed URLs
   that expire after 12 hours. HEIC from iPhones gets converted to JPEG by the photo picker.
@@ -102,5 +104,5 @@ Any static-capable host works; the app is fully client-side.
 
 ## Ideas for v2
 
-Typing indicator (Realtime presence), reactions (a `reactions` table), search (Postgres full-text
+Search (Postgres full-text
 on `body`), "on this day" photos, voice notes (MediaRecorder → same bucket), captions on photos.

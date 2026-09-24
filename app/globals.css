@@ -486,3 +486,212 @@ input:focus { border-color: var(--accent); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .topbar, .composer, .sheet, .login-card { background: var(--glass-strong); }
 }
+
+/* ============================================================
+   Message interactions: reactions, action menu, edit, unsend, typing
+   ============================================================ */
+
+/* ---------- bubbles: gestures instead of text selection ---------- */
+/* manipulation = no double-tap zoom on iOS; no selection/callout so long-press opens our menu.
+   The Lightbox image keeps its own press-and-hold-to-save callout. */
+.bubble,
+.photo {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.photo img { -webkit-touch-callout: none; pointer-events: none; }
+.bubble-wrap { position: relative; max-width: 100%; }
+.bubble-wrap.has-reactions { margin-bottom: 14px; }
+.msg.editing .bubble { outline: 2px solid var(--accent); outline-offset: 2px; }
+.edited { font-style: italic; }
+
+/* ---------- reaction chip ---------- */
+.reactions {
+  position: absolute;
+  bottom: -15px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 26px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-shine);
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: none;
+  animation: chip-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1.4);
+}
+.mine .reactions { left: -8px; }
+.theirs .reactions { right: -8px; }
+.reactions-count { margin-left: 2px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+@keyframes chip-in { from { transform: scale(0.4); opacity: 0; } }
+
+/* ---------- double-tap heart pop ---------- */
+.heart-pop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.heart-pop .heart {
+  width: 46px;
+  height: 46px;
+  fill: var(--accent);
+  filter: drop-shadow(0 4px 12px var(--mine-glow));
+  animation: heart-pop 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.mine .heart-pop .heart,
+.photo + .heart-pop .heart { fill: #fff; }
+@keyframes heart-pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  25% { transform: scale(1.25); opacity: 1; }
+  45% { transform: scale(0.95); }
+  70% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1.1) translateY(-10px); opacity: 0; }
+}
+
+/* ---------- long-press action menu ---------- */
+.menu-layer { position: fixed; inset: 0; z-index: 45; }
+.msg-menu {
+  position: fixed;
+  width: min(352px, calc(100vw - 16px));
+  padding: 8px;
+  border-radius: 24px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-shine);
+  animation: menu-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.msg-menu.from-end { transform-origin: bottom right; }
+.msg-menu.from-start { transform-origin: bottom left; }
+@keyframes menu-in { from { transform: scale(0.9); opacity: 0; } }
+
+.menu-emojis { display: flex; gap: 2px; }
+.menu-emojis button {
+  flex: 1 1 0;
+  min-width: 40px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  font-size: 26px;
+  line-height: 1;
+  transition: transform 0.12s, background 0.12s;
+}
+.menu-emojis button:active { transform: scale(1.2); }
+.menu-emojis button.on {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.menu-emojis .menu-more { font-size: 24px; font-weight: 500; color: var(--muted); background: var(--line); }
+
+.menu-actions { display: flex; flex-direction: column; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.menu-item:active { background: var(--line); }
+.menu-item svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.menu-confirm p { margin: 8px 8px 12px; font-weight: 650; text-align: center; }
+.menu-confirm-row { display: flex; gap: 8px; }
+.menu-confirm-row button { flex: 1; min-height: 46px; }
+.menu-unsend {
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/* "+" → type any emoji. The input stays mounted (just clipped) so it can take focus inside the tap. */
+.menu-pick:not(.open) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+}
+.menu-pick input { width: 100%; font-size: 24px; text-align: center; }
+.menu-pick:not(.open) input { padding: 0; border: 0; font-size: 16px; }
+.menu-hint { margin: 8px 4px 2px; font-size: 13px; text-align: center; color: var(--muted); }
+
+/* ---------- edit mode banner above the composer ---------- */
+.edit-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 6px;
+  padding: 0 0 0 14px;
+  border-radius: 22px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bar);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-shine);
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--accent);
+  animation: rise 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.edit-banner svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.edit-banner span { flex: 1; }
+.edit-cancel { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; font-size: 15px; color: var(--muted); }
+
+/* ---------- unsent placeholder ---------- */
+.unsent-note {
+  margin: 0;
+  padding: 7px 13px;
+  border-radius: 18px;
+  border: 1px dashed var(--line);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* ---------- typing indicator ---------- */
+.partner-box { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.partner-box .partner { flex: none; }
+.typing-line { margin: 1px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
+
+.typing-msg { animation: chip-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: bottom left; }
+.typing-bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
+.typing-bubble span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-bubble span:nth-child(2) { animation-delay: 0.15s; }
+.typing-bubble span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-pop { display: none; }
+  .reactions, .msg-menu, .edit-banner, .typing-msg { animation: none; }
+  .menu-emojis button { transition: none; }
+  .menu-emojis button:active { transform: none; }
+  .typing-bubble span { animation: none; opacity: 0.7; }
+}
