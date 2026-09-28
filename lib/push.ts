@@ -80,16 +80,21 @@ export async function sendTestPush(): Promise<string | null> {
     body: { test: true, publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY },
   });
   if (error) {
-    const res = (error as { context?: Response }).context;
-    if (res?.status === 404) {
+    // Only HTTP/relay errors carry a Response; a network or CORS failure carries the fetch error
+    const ctx = (error as { context?: unknown }).context;
+    const res = ctx instanceof Response ? ctx : null;
+    if (!res) {
+      return "Couldn't reach the notify function. It is most likely still running the old code: redeploy it (supabase functions deploy notify --no-verify-jwt, or paste the new code in Supabase → Edge Functions → notify) with Verify JWT turned off.";
+    }
+    if (res.status === 404) {
       return "The notify function isn't deployed. Run: supabase functions deploy notify --no-verify-jwt";
     }
-    const body = await res?.json().catch(() => null);
+    const body = await res.json().catch(() => null);
     if (body?.error) return body.error;
-    if (res?.status === 401) {
-      return "The notify function rejected the request. Redeploy it with --no-verify-jwt.";
+    if (res.status === 401) {
+      return "The notify function rejected the request. Redeploy it with the new code and Verify JWT turned off.";
     }
-    return `Couldn't reach the notify function: ${error.message}`;
+    return `The notify function failed (${res.status}). Check Supabase → Edge Functions → notify → Logs.`;
   }
   return data?.ok ? null : (data?.error ?? "The test notification couldn't be sent.");
 }
