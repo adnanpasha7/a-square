@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { disablePush, enablePush, getPushState, type PushState } from "@/lib/push";
+import { disablePush, enablePush, getPushState, sendTestPush, type PushState } from "@/lib/push";
 import type { LiveRole } from "@/lib/live";
 import LiveConsent from "./LiveConsent";
 
@@ -31,6 +31,7 @@ export default function Settings({
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     getPushState().then(setState).catch(() => setState("unsupported"));
@@ -52,6 +53,23 @@ export default function Settings({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change notifications.");
       setState(await getPushState());
+    }
+    setBusy(false);
+  }
+
+  async function test() {
+    setBusy(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const problem = await sendTestPush();
+      if (problem) setError(problem);
+      else
+        setTestResult(
+          "Sent. Go to your Home Screen now: it arrives in about 5 seconds. If it does, this phone is fine, and if messages still don't notify, the Database Webhook in Supabase is missing or has the wrong x-webhook-secret.",
+        );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send a test notification.");
     }
     setBusy(false);
   }
@@ -86,6 +104,13 @@ export default function Settings({
             </button>
           )}
         </div>
+        {state === "on" && (
+          <div className="sheet-row">
+            <p className="muted">Not getting notifications? Tap Send test, then go to your Home Screen.</p>
+            <button className="ghost" onClick={test} disabled={busy}>Send test</button>
+          </div>
+        )}
+        {testResult && <p className="muted" role="status">{testResult}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         <div className="sheet-row">
           <button className="ghost danger" onClick={() => supabase.auth.signOut()}>Sign out</button>

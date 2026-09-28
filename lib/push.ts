@@ -72,3 +72,24 @@ export async function disablePush() {
   await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
   await sub.unsubscribe();
 }
+
+// Asks the notify function to push a test notification to this user's own devices.
+// Returns null on success, or a human-readable reason it failed.
+export async function sendTestPush(): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke("notify", {
+    body: { test: true, publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY },
+  });
+  if (error) {
+    const res = (error as { context?: Response }).context;
+    if (res?.status === 404) {
+      return "The notify function isn't deployed. Run: supabase functions deploy notify --no-verify-jwt";
+    }
+    const body = await res?.json().catch(() => null);
+    if (body?.error) return body.error;
+    if (res?.status === 401) {
+      return "The notify function rejected the request. Redeploy it with --no-verify-jwt.";
+    }
+    return `Couldn't reach the notify function: ${error.message}`;
+  }
+  return data?.ok ? null : (data?.error ?? "The test notification couldn't be sent.");
+}
